@@ -22,7 +22,19 @@ func main(){
 		log.Fatalln("Args is not enough.")
 	}
 
-	s3,err := gos3.NewSession("s3-conf.json")
+	// 実行ファイルのパスを取得
+	executablePath, err := os.Executable()
+	if err != nil {
+		log.Fatalf("failed to find executable path: %v", err)
+	}
+
+	// 実行ファイルのディレクトリを取得
+	executableDir := filepath.Dir(executablePath)
+
+	// 相対パスを指定してファイルパスを作成
+	filePath := filepath.Join(executableDir, "s3-conf.json")
+	
+	s3,err := gos3.NewSession(filePath)
 	if err!=nil{
 		log.Fatalln(err)
 	}
