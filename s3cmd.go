@@ -32,15 +32,9 @@ func main(){
 		ls(&s3,args[1])
 		break
 	case "upload":
-		upload(&s3,args[1],args[2])
-		break
-	case "download":
-		download(&s3,args[1],args[2])
-		break
-	case "targz-upload":
 		targzUpload(&s3,args[1],args[2])
 		break
-	case "targz-download":
+	case "download":
 		targzDownload(&s3,args[1],args[2])
 		break
 	}
