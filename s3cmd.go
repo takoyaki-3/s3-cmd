@@ -6,7 +6,6 @@ import (
 	"log"
 	"io"
 	"os"
-	"bytes"
 
 	gos3 "github.com/takoyaki-3/go-s3"
 	"compress/gzip"
@@ -85,24 +84,23 @@ func download(s3 *gos3.Session,org,dst string)error{
 	})
 }
 
-func targzUpload(s3 *gos3.Session,org,dst string)error{
-	buf := new(bytes.Buffer)
+func targzUpload(s3 *gos3.Session, org, dst string) error {
+	pr, pw := io.Pipe()
 
-	func()error{
-		gw := gzip.NewWriter(buf)
+	go func() {
+		defer pw.Close()
+
+		gw := gzip.NewWriter(pw)
 		defer gw.Close()
 
 		tw := tar.NewWriter(gw)
 		defer tw.Close()
-		
-		// 再帰的にファイルを取得する
-		if err := filepath.Walk(org, func(path string, info os.FileInfo, err error) error {
-			// ディレクトリは無視
+
+		err := filepath.Walk(org, func(path string, info os.FileInfo, err error) error {
 			if info.IsDir() {
 				return nil
 			}
 
-			// ヘッダを書き込み
 			if err := tw.WriteHeader(&tar.Header{
 				Name:    path,
 				Mode:    int64(info.Mode()),
@@ -112,7 +110,6 @@ func targzUpload(s3 *gos3.Session,org,dst string)error{
 				return err
 			}
 
-			// ファイルを書き込み
 			f, err := os.Open(path)
 			if err != nil {
 				return err
@@ -123,16 +120,17 @@ func targzUpload(s3 *gos3.Session,org,dst string)error{
 			}
 
 			return nil
-		}); err != nil {
-			return err
+		})
+		if err != nil {
+			log.Fatalln(err)
 		}
-		return nil
 	}()
 
-	if err:=s3.UploadFromReader(bytes.NewReader(buf.Bytes()),dst);err!=nil{
+	if err := s3.UploadFromReader(pr, dst); err != nil {
 		log.Fatalln(err)
 		return err
 	}
+
 	return nil
 }
 
