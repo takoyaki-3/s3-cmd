@@ -6,6 +6,7 @@ import (
 	"log"
 	"io"
 	"os"
+	"strings"
 
 	gos3 "github.com/takoyaki-3/go-s3"
 	"compress/gzip"
@@ -134,9 +135,8 @@ func targzUpload(s3 *gos3.Session, org, dst string) error {
 	return nil
 }
 
-func targzDownload(s3 *gos3.Session,org,dst string)error{
-	return s3.DownloadToReaderFunc(org,func(r io.Reader) error {
-
+func targzDownload(s3 *gos3.Session, org, dst string) error {
+	return s3.DownloadToReaderFunc(org, func(r io.Reader) error {
 		// gzipの展開
 		gzipReader, err := gzip.NewReader(r)
 		defer gzipReader.Close()
@@ -147,22 +147,32 @@ func targzDownload(s3 *gos3.Session,org,dst string)error{
 		// tarの展開
 		tarReader := tar.NewReader(gzipReader)
 
-		for tarReader != nil {
+		for {
 			tarHeader, err := tarReader.Next()
 			if err == io.EOF {
 				break
 			}
-
-			dir := filepath.Dir(dst+"/"+tarHeader.Name)
-			if err:=os.MkdirAll(dir,0777);err!=nil{
-				// return err
-			}
-
-			f, err := os.Create(dst+"/"+tarHeader.Name)
 			if err != nil {
 				return err
 			}
-			if _,err:=io.Copy(f,tarReader);err!=nil{
+
+			// ￥の区切り文字をOS依存の区切り文字に置き換える
+			cleanName := strings.ReplaceAll(tarHeader.Name, "\\", string(os.PathSeparator))
+			
+			// ファイルパスを結合する際に filepath.Join を使用
+			fullPath := filepath.Join(dst, cleanName)
+			dir := filepath.Dir(fullPath)
+
+			if err := os.MkdirAll(dir, 0777); err != nil {
+				return err
+			}
+
+			f, err := os.Create(fullPath)
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(f, tarReader); err != nil {
+				f.Close()
 				return err
 			}
 			f.Close()
